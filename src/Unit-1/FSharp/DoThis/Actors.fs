@@ -18,14 +18,14 @@ let ContinueCommand = "continue"
 [<Literal>]
 let EmptyCommand = ""
 
-let consoleReaderActor (validationActor: ActorRef) (mailbox: Actor<_>) message = 
+let consoleReaderActor (mailbox: Actor<_>) message = 
     let printInstructions() =
         Console.WriteLine "Please provide the URI of a log file on disk.\n"
 
     let getAndValidateInput() =
         match Console.ReadLine() with
         | ExitCommand -> mailbox.Context.System.Shutdown()
-        | msg -> validationActor <! msg
+        | msg -> select "user/validationActor" mailbox.Context.System <! msg
 
     match message.ToString().ToLower() with
     | StartCommand -> printInstructions()
@@ -48,7 +48,7 @@ let consoleWriterActor message =
         | InputSuccess(reason) -> printInColor ConsoleColor.Green reason
     | _ -> printInColor ConsoleColor.Black (message.ToString ())
 
-let fileValidationActor (consoleWriter : ActorRef) (tailCoordinator : ActorRef) (mailbox : Actor<_>) message =
+let fileValidationActor (consoleWriter : ActorRef) (mailbox : Actor<_>) message =
     let (|IsFileUri|_|) path = if System.IO.File.Exists path then Some path else None
     
     match message with
@@ -57,7 +57,7 @@ let fileValidationActor (consoleWriter : ActorRef) (tailCoordinator : ActorRef) 
         mailbox.Sender () <! ContinueProcessing
     | IsFileUri _ ->
         consoleWriter <! InputSuccess(sprintf "Starting processing for %s" message)
-        tailCoordinator <! StartTail(message, consoleWriter)
+        select "user/tailCoordinatorActor" mailbox.Context.System <! StartTail(message, consoleWriter)
     | _ ->
         consoleWriter <! InputError(sprintf "%s is not an existing URI on disk." message, ErrorType.Validation)
         mailbox.Sender () <! ContinueProcessing

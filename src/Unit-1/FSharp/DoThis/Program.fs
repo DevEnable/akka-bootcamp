@@ -16,10 +16,10 @@ let main argv =
     let tailCoordinatorActor = spawnOpt myActorSystem "tailCoordinatorActor" (actorOf2 Actors.tailCoordinatorActor) [SpawnOption.SupervisorStrategy(Strategies.tailCoordinatorStrategy ())]
 
     let validationActor =
-        spawnOpt myActorSystem "validationActor" (actorOf2 (Actors.fileValidationActor consoleWriterActor tailCoordinatorActor)) [SpawnOption.Deploy(Deploy.Local)]
-    
+        spawnOpt myActorSystem "validationActor" (actorOf2 (Actors.fileValidationActor consoleWriterActor)) [SpawnOption.Deploy(Deploy.Local)]
+
     let consoleReaderActor = 
-        spawnOpt myActorSystem "consoleReaderActor" (actorOf2 (Actors.consoleReaderActor validationActor)) [SpawnOption.Router(Akka.Routing.RouterConfig.NoRouter)]
+        spawnOpt myActorSystem "consoleReaderActor" (actorOf2 Actors.consoleReaderActor) [SpawnOption.Router(Akka.Routing.RouterConfig.NoRouter)]
     
     consoleReaderActor <! Actors.StartCommand
 

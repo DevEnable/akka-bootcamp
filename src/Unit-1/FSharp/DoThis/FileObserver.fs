@@ -19,3 +19,6 @@ type FileObserver(tailActor: ActorRef, absoluteFilePath: string) =
         watcher.Changed.Add (fun e -> if e.ChangeType = WatcherChangeTypes.Changed then tailActor <! FileWrite(e.Name))
         watcher.Error.Add(fun e -> tailActor <! FileError(fileNameOnly, e.GetException().Message))
         watcher.EnableRaisingEvents <- true
+
+    interface IDisposable with
+        member this.Dispose () = watcher.Dispose ()

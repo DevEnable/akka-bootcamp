@@ -65,13 +65,17 @@ let fileValidationActor (consoleWriter : ActorRef) (mailbox : Actor<_>) message 
 type TailActor(reporter, filePath) as this =
     inherit UntypedActor()
 
-    let observer = new FileObserver(this.Self, filePath)
-    do observer.Start()
+    let mutable observer = Some <| new FileObserver(this.Self, Path.GetFullPath(filePath))
+    let mutable reader = null
 
-    let fileStream = new FileStream(Path.GetFullPath(filePath), FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
-    let reader = new StreamReader(fileStream, System.Text.Encoding.UTF8)
-    let text = reader.ReadToEnd()
-    do this.Self <! InitialRead(filePath, text)
+    override this.PreStart() =
+        observer.Value.Start()
+
+        let fileStream = new FileStream(Path.GetFullPath(filePath), FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
+        reader <- new StreamReader(fileStream, System.Text.Encoding.UTF8)
+
+        let text = reader.ReadToEnd()
+        this.Self <! InitialRead(filePath, text)
 
     override this.OnReceive message =
         match message :?> FileCommand with
@@ -83,6 +87,13 @@ type TailActor(reporter, filePath) as this =
             reporter <! sprintf "Tail error: %s" reason
         | InitialRead(_, text) ->
             reporter <! text
+    
+    override this.PostStop() =
+        (observer.Value :> IDisposable).Dispose()
+        observer <- None
+        reader.Close()
+        reader.Dispose()
+        base.PostStop()
 
 let tailCoordinatorActor (mailbox: Actor<_>) message =
     match message with

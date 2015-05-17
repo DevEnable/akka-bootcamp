@@ -26,6 +26,7 @@ let series1 = new Series(Name = "Series1", ChartArea = "ChartArea1", Legend = "L
 let btnCpu = new Button(Name = "btnCpu", Text = "CPU (ON)", Location = Point(562, 274), Size = Size(110, 41), TabIndex = 1, UseVisualStyleBackColor = true)
 let btnMemory = new Button(Name = "btnMemory", Text = "MEMORY (OFF)", Location = Point(562, 321), Size = Size(110, 41), TabIndex = 2, UseVisualStyleBackColor = true)
 let btnDisk = new Button(Name = "btnDisk", Text = "DISK (OFF)", Location = Point(562, 368), Size = Size(110, 41), TabIndex = 3, UseVisualStyleBackColor = true)
+let btnPauseResume = new Button(Name = "btnPauseResume", Text = "PAUSE ||", Location = Point(562, 205), Size = Size(110, 41), TabIndex = 3, UseVisualStyleBackColor = true)
 sysChart.BeginInit ()
 form.SuspendLayout ()
 sysChart.ChartAreas.Add chartArea1
@@ -34,11 +35,12 @@ sysChart.Series.Add series1
 form.Controls.Add btnCpu
 form.Controls.Add btnMemory
 form.Controls.Add btnDisk
+form.Controls.Add btnPauseResume
 form.Controls.Add sysChart
 sysChart.EndInit ()
 form.ResumeLayout false
 
-let chartActor = spawn chartActors "charting" (actorOf (Actors.chartingActor sysChart))
+let chartActor = spawn chartActors "charting" (Actors.chartingActor sysChart btnPauseResume)
 chartActor <! InitializeChart(Map.empty)
 
 let coordinatorActor = spawn chartActors "counters" (actorOf2 (Actors.performanceCounterCoordinatorActor chartActor))
@@ -52,6 +54,7 @@ toggleActors.[CounterType.Cpu] <! Toggle
 btnCpu.Click.Add (fun _ -> toggleActors.[CounterType.Cpu] <! Toggle)
 btnMemory.Click.Add (fun _ -> toggleActors.[CounterType.Memory] <! Toggle)
 btnDisk.Click.Add (fun _ -> toggleActors.[CounterType.Disk] <! Toggle)
+btnPauseResume.Click.Add (fun _ -> chartActor <! TogglePause)
 
 [<STAThread>]    
 do Application.Run (form)

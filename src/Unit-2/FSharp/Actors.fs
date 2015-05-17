@@ -10,7 +10,7 @@ open System.Windows.Forms.DataVisualization.Charting
 open Akka.Actor
 open Akka.FSharp
 
-let chartingActor (chart: Chart) =
+let chartingActor (chart: Chart) (pauseButton : Button) =
     let maxPoints = 250
     let xPosCounter = ref 0.
     let seriesIndex = ref Map.empty  
@@ -29,8 +29,8 @@ let chartingActor (chart: Chart) =
             chart.ChartAreas.[0].AxisY.Minimum <- if yValues |> List.length > 0 then Math.Floor(yValues |> List.min) else 0.
         else
             ()
-    
-    (fun message -> 
+
+    let runningHandler message =
         match message with
         | InitializeChart series -> 
             chart.Series.Clear ()
@@ -49,8 +49,47 @@ let chartingActor (chart: Chart) =
             series.Points.AddXY (!xPosCounter, counterValue) |> ignore
             while (series.Points.Count > maxPoints) do series.Points.RemoveAt 0
         | _ -> ()
+
         setChartBoundaries ()
-    )
+
+    let pausedHandler message =
+        match message with
+        | Metric(seriesName, counterValue) when not (String.IsNullOrEmpty seriesName) && !seriesIndex |> Map.containsKey seriesName -> 
+            let series = (!seriesIndex).[seriesName]
+            xPosCounter := !xPosCounter + 1.
+            series.Points.AddXY(!xPosCounter, 0.) |> ignore
+            while (series.Points.Count > maxPoints) do series.Points.RemoveAt 0
+        | _ -> ()
+        setChartBoundaries()
+
+    let setPauseButtonText paused =
+        pauseButton.Text <- if paused then "RESUME -> " else "PAUSE  ||"
+
+    (fun (mailbox : Actor<_>) ->
+        let rec runningChartActor() = 
+            actor {
+                let! message = mailbox.Receive()
+                match message with
+                | TogglePause ->
+                    setPauseButtonText true
+                    return! pausedChartActor()
+                | m ->
+                    runningHandler m
+                    return! runningChartActor()
+            }
+         and pausedChartActor() =
+            actor {
+                let! message = mailbox.Receive()
+
+                match message with
+                | TogglePause ->
+                    setPauseButtonText false
+                    return! runningChartActor()
+                | m ->
+                    pausedHandler m
+                    return! pausedChartActor()
+            }
+        runningChartActor())
 
 type PerformanceCounterActor(seriesName: string, performanceCounterGenerator: unit -> PerformanceCounter) as this =
     inherit UntypedActor()

@@ -15,6 +15,7 @@ type ChartMessage =
 | AddSeries of series: Series
 | RemoveSeries of seriesName : string
 | Metric of series : string * counterValue : float
+| TogglePause
 
 type ActorSubscription = { CounterType : CounterType; Subscriber : ActorRef}
 

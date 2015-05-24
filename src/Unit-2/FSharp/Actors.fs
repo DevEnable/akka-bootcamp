@@ -49,7 +49,6 @@ let chartingActor (chart: Chart) (pauseButton : Button) =
             series.Points.AddXY (!xPosCounter, counterValue) |> ignore
             while (series.Points.Count > maxPoints) do series.Points.RemoveAt 0
         | _ -> ()
-
         setChartBoundaries ()
 
     let pausedHandler message =

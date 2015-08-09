@@ -23,26 +23,38 @@ let form = new Form(Name = "Main", Visible = true, Text = "System Metrics", Auto
 let chartArea1 = new ChartArea(Name = "ChartArea1")
 let legend1 = new Legend(Name = "Legend1")
 let series1 = new Series(Name = "Series1", ChartArea = "ChartArea1", Legend = "Legend1")
-let button1 = new Button(Name = "button1", Text = "Add Series", Location = Point(573, 366), Size = Size(99, 36), TabIndex = 1, UseVisualStyleBackColor = true)
+let btnCpu = new Button(Name = "btnCpu", Text = "CPU (ON)", Location = Point(562, 274), Size = Size(110, 41), TabIndex = 1, UseVisualStyleBackColor = true)
+let btnMemory = new Button(Name = "btnMemory", Text = "MEMORY (OFF)", Location = Point(562, 321), Size = Size(110, 41), TabIndex = 2, UseVisualStyleBackColor = true)
+let btnDisk = new Button(Name = "btnDisk", Text = "DISK (OFF)", Location = Point(562, 368), Size = Size(110, 41), TabIndex = 3, UseVisualStyleBackColor = true)
+let btnPauseResume = new Button(Name = "btnPauseResume", Text = "PAUSE ||", Location = Point(562, 205), Size = Size(110, 41), TabIndex = 3, UseVisualStyleBackColor = true)
 sysChart.BeginInit ()
 form.SuspendLayout ()
 sysChart.ChartAreas.Add chartArea1
 sysChart.Legends.Add legend1
 sysChart.Series.Add series1
-form.Controls.Add button1
+form.Controls.Add btnCpu
+form.Controls.Add btnMemory
+form.Controls.Add btnDisk
+form.Controls.Add btnPauseResume
 form.Controls.Add sysChart
 sysChart.EndInit ()
 form.ResumeLayout false
 
-let getFakeSeries counter = ChartDataHelper.randomSeries ("FakeSeries" + string (counter)) None None
+let chartActor = spawn chartActors "charting" (Actors.chartingActor sysChart btnPauseResume)
+chartActor <! InitializeChart(Map.empty)
 
-let chartActor = spawn chartActors "charting" (actorOf (Actors.chartingActor sysChart))
-let series = seriesCounter.GetAndIncrement () |> getFakeSeries
-chartActor <! InitializeChart(Map.ofList [(series.Name, series)])
+let coordinatorActor = spawn chartActors "counters" (actorOf2 (Actors.performanceCounterCoordinatorActor chartActor))
 
-button1.Click.Add (fun _ -> 
-    let series = seriesCounter.GetAndIncrement () |> getFakeSeries
-    chartActor <! AddSeries(series))
+let toggleActors = Map.ofList [(CounterType.Cpu, spawnOpt chartActors "cpuCounter" (actorOf2 (Actors.buttonToggleActor coordinatorActor btnCpu CounterType.Cpu false)) [SpawnOption.Dispatcher("akka.actor.synchronized-dispatcher")])
+                               (CounterType.Memory, spawnOpt chartActors "memoryCounter" (actorOf2 (Actors.buttonToggleActor coordinatorActor btnMemory CounterType.Memory false)) [SpawnOption.Dispatcher("akka.actor.synchronized-dispatcher")])
+                               (CounterType.Disk, spawnOpt chartActors "diskCounter" (actorOf2 (Actors.buttonToggleActor coordinatorActor btnDisk CounterType.Disk false)) [SpawnOption.Dispatcher("akka.actor.synchronized-dispatcher")])]
+
+toggleActors.[CounterType.Cpu] <! Toggle
+
+btnCpu.Click.Add (fun _ -> toggleActors.[CounterType.Cpu] <! Toggle)
+btnMemory.Click.Add (fun _ -> toggleActors.[CounterType.Memory] <! Toggle)
+btnDisk.Click.Add (fun _ -> toggleActors.[CounterType.Disk] <! Toggle)
+btnPauseResume.Click.Add (fun _ -> chartActor <! TogglePause)
 
 [<STAThread>]    
 do Application.Run (form)
